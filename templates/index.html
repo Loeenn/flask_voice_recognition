@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice Input App</title>
+    <style>
+        #drop-zone {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .active {
+            background-color: #eee;
+        }
+    </style>
+</head>
+<body>
+    <h2>Определение параметров для ввода через голос</h2>
+    <button onclick="startRecording()">Начать запись</button>
+    <button onclick="stopRecording()" disabled>Завершить запись</button>
+    <div id="result">
+        <p>Распознанная дата: {{date}}</p>
+        <p>Распознанный текст: {{text}}</p>
+        <p>Распознанный дефект: {{defects}}</p>
+        <div id="drop-zone">
+            <p>Перетащите файл сюда или кликните для выбора файла</p>
+            <input type="file" id="file-input" hidden>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', function() {
+                const file = this.files[0];
+                uploadFile(file);
+            });
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('active');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('active');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('active');
+                const file = e.dataTransfer.files[0];
+                uploadFile(file);
+            });
+
+            function uploadFile(file) {
+                const formData = new FormData();
+                formData.append("file", file);
+                fetch("/upload", {
+                    method: "POST",
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    // Process the response data here
+                })
+                .catch(error => console.error('Error uploading file:', error));
+            }
+
+            let mediaRecorder;
+            let audioChunks = [];
+
+            window.startRecording = function() {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.start();
+                    mediaRecorder.addEventListener("dataavailable", event => {
+                        audioChunks.push(event.data);
+                    });
+                    mediaRecorder.addEventListener("stop", () => {
+                        const audioBlob = new Blob(audioChunks);
+                        uploadFile(audioBlob);
+                        audioChunks = [];
+                    });
+                    document.querySelector("button[onclick='startRecording()']").disabled = true;
+                    document.querySelector("button[onclick='stopRecording()']").disabled = false;
+                });
+            }
+
+            window.stopRecording = function() {
+                mediaRecorder.stop();
+                document.querySelector("button[onclick='startRecording()']").disabled = false;
+                document.querySelector("button[onclick='stopRecording()']").disabled = true;
+            }
+        });
+    </script>
+</body>
+</html>
